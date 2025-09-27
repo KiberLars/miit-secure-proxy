@@ -1,0 +1,14 @@
+sessions:
+  cookieDomain: .secure-proxy.lan
+  cookieName: SECURE_PROXY_SESSION
+  ttlSeconds: 18000
+
+users:
+  - username: user1
+    totpSecret: FC5PJKPSPKIO5HE2Y5YDIEJJ3ZOJ5J3K
+    availableDomains:
+      - site1.secure-proxy.lan
+
+upstreams:
+  - host: site1.secure-proxy.lan
+    destination: http://127.0.0.1:8002
