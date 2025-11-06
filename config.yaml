@@ -1,14 +1,16 @@
 sessions:
-  cookieDomain: .secure-proxy.lan
-  cookieName: SECURE_PROXY_SESSION
-  ttlSeconds: 18000
-
+    cookieDomain: .secure-proxy.lan
+    cookieName: SECURE_PROXY_SESSION
+    ttlSeconds: 18000
 users:
-  - username: user1
-    totpSecret: FC5PJKPSPKIO5HE2Y5YDIEJJ3ZOJ5J3K
-    availableDomains:
-      - site1.secure-proxy.lan
-
+    - username: user1
+      totpSecret: FC5PJKPSPKIO5HE2Y5YDIEJJ3ZOJ5J3K
+      allowedPaths:
+        - site1.secure-proxy.lan/warehouse
+    - username: sklad
+      totpSecret: VGLFTEMMJYNRCC36PNS6ZCURQPLYAXRY
+      allowedPaths:
+        - site1.secure-proxy.lan/склад
 upstreams:
-  - host: site1.secure-proxy.lan
-    destination: http://127.0.0.1:8002
+    - host: site1.secure-proxy.lan
+      destination: http://127.0.0.1:8000

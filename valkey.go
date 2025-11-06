@@ -14,14 +14,13 @@ func NewValkeyClient() (valkey.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	// Test connection
+
 	ctx := context.Background()
 	err = client.Do(ctx, client.B().Ping().Build()).Error()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	log.Println("Connected to Valkey successfully")
 	return client, nil
 }

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Управление пользователями и сессиями</title>
+    <meta charset="utf-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 20px auto; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; margin-top: 30px; }
+        .section { 
+            background: white; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px;
+        }
+        th, td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #007cba; 
+            color: white; 
+            font-weight: bold;
+        }
+        tr:hover { background-color: #f9f9f9; }
+        .btn { 
+            background: #dc3545; 
+            color: white; 
+            padding: 6px 12px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 12px;
+        }
+        .btn:hover { background: #c82333; }
+        .btn-refresh {
+            background: #28a745;
+            margin-bottom: 15px;
+        }
+        .btn-refresh:hover { background: #218838; }
+        .status-active { color: #28a745; font-weight: bold; }
+        .status-expired { color: #dc3545; }
+        .no-data { color: #999; text-align: center; padding: 20px; }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            background: #6c757d;
+            color: white;
+        }
+        .btn-add {
+            background: #007cba;
+            margin-bottom: 15px;
+        }
+            .btn-add:hover { background: #005a87; }
+        .btn-delete {
+            background: #dc3545;
+        }
+            .btn-delete:hover { background: #c82333; }
+        .btn-edit {
+            background: #ffc107;
+            color: #333;
+            margin-right: 5px;
+        }
+            .btn-edit:hover { background: #e0a800; }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            min-height: 60px;
+            font-family: monospace;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+        .totp-secret {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .totp-code {
+            font-family: monospace;
+            background: #e7f3ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Управление пользователями и сессиями</h1>
+    
+    <div class="section">
+        <h2>Пользователи</h2>
+        <button class="btn btn-refresh" onclick="loadUsers()">Обновить</button>
+        <button class="btn btn-add" onclick="showCreateUserModal()">Создать пользователя</button>
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>Имя пользователя</th>
+                    <th>TOTP Секрет</th>
+                    <th>TOTP Код</th>
+                    <th>Разрешенные пути</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="usersBody">
+                <tr><td colspan="5" class="no-data">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>Активные сессии</h2>
+        <button class="btn btn-refresh" onclick="loadSessions()">Обновить</button>
+        <table id="sessionsTable">
+            <thead>
+                <tr>
+                    <th>Ключ сессии</th>
+                    <th>Пользователь</th>
+                    <th>TTL (секунды)</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="sessionsBody">
+                <tr><td colspan="4" class="no-data">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Модальное окно создания пользователя -->
+    <div id="createUserModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <h2 id="modalTitle">Создать пользователя</h2>
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="username">Имя пользователя:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="allowedPaths">Разрешенные пути (по одному на строку):</label>
+                    <textarea id="allowedPaths" name="allowedPaths" placeholder="site1.secure-proxy.lan/склад&#10;site1.secure-proxy.lan/кухня&#10;site1.secure-proxy.lan/официант"></textarea>
+                    <div class="help-text">Формат: домен/путь (например, site1.secure-proxy.lan/склад). Это даст доступ ко всем URL вида домен/путь/*. Также можно указать просто домен (доступ ко всему домену) или /путь (доступ к пути на любом домене).</div>
+                </div>
+                <button type="submit" class="btn btn-add" id="submitButton">Создать</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function loadUsers() {
+            fetch('/api/users')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('usersBody');
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Нет пользователей</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.map(user => {
+                        const pathsHtml = user.allowedPaths && user.allowedPaths.length > 0 
+                            ? user.allowedPaths.map(p => {
+                                // Определяем тип: домен/путь, /путь, или домен
+                                let badgeColor = '#6c757d'; // серый по умолчанию
+                                if (p.includes('/') && !p.startsWith('/')) {
+                                    badgeColor = '#17a2b8'; // синий для домен/путь
+                                } else if (p.startsWith('/')) {
+                                    badgeColor = '#28a745'; // зеленый для /путь
+                                }
+                                return `<span class="badge" style="background: ${badgeColor};">${escapeHtml(p)}</span>`;
+                            }).join(' ') 
+                            : '<span class="no-data">Все пути</span>';
+                        return `
+                        <tr>
+                            <td><strong>${escapeHtml(user.username)}</strong></td>
+                            <td><span class="totp-secret">${escapeHtml(user.totpSecret)}</span></td>
+                            <td><span class="totp-code">${user.totpCode || '-'}</span></td>
+                            <td>${pathsHtml}</td>
+                            <td>
+                                <button class="btn btn-edit" onclick="editUser('${escapeHtml(user.username)}')">Редактировать</button>
+                                <button class="btn btn-delete" onclick="deleteUser('${escapeHtml(user.username)}')">Удалить</button>
+                            </td>
+                        </tr>
+                    `;
+                    }).join('');
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки пользователей:', error);
+                    document.getElementById('usersBody').innerHTML = '<tr><td colspan="5" class="no-data">Ошибка загрузки</td></tr>';
+                });
+        }
+
+        function loadSessions() {
+            fetch('/api/sessions')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('sessionsBody');
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="no-data">Нет активных сессий</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.map(session => `
+                        <tr>
+                            <td><code style="font-size: 11px;">${escapeHtml(session.key.substring(0, 16))}...</code></td>
+                            <td><strong>${escapeHtml(session.username)}</strong></td>
+                            <td><span class="status-active">${session.ttl}</span></td>
+                            <td>
+                                <button class="btn" onclick="deleteSession('${session.key}')">Удалить</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки сессий:', error);
+                    document.getElementById('sessionsBody').innerHTML = '<tr><td colspan="4" class="no-data">Ошибка загрузки</td></tr>';
+                });
+        }
+
+        function deleteSession(sessionKey) {
+            if (!confirm('Вы уверены, что хотите удалить эту сессию?')) {
+                return;
+            }
+            
+            fetch(`/api/sessions/${encodeURIComponent(sessionKey)}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (response.ok) {
+                        loadSessions();
+                    } else {
+                        alert('Ошибка при удалении сессии');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка удаления сессии:', error);
+                    alert('Ошибка при удалении сессии');
+                });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        let currentEditUsername = null;
+
+        function showCreateUserModal() {
+            currentEditUsername = null;
+            document.getElementById('modalTitle').textContent = 'Создать пользователя';
+            document.getElementById('submitButton').textContent = 'Создать';
+            document.getElementById('username').disabled = false;
+            document.getElementById('userForm').reset();
+            document.getElementById('createUserModal').style.display = 'block';
+        }
+
+        function editUser(username) {
+            currentEditUsername = username;
+            document.getElementById('modalTitle').textContent = 'Редактировать пользователя';
+            document.getElementById('submitButton').textContent = 'Сохранить';
+            document.getElementById('username').disabled = true;
+            document.getElementById('username').value = username;
+            
+            // Загружаем данные пользователя
+            fetch('/api/users')
+                .then(response => response.json())
+                .then(users => {
+                    const user = users.find(u => u.username === username);
+                    if (user) {
+                        document.getElementById('allowedPaths').value = user.allowedPaths.join('\n');
+                    }
+                });
+            
+            document.getElementById('createUserModal').style.display = 'block';
+        }
+
+        function closeUserModal() {
+            document.getElementById('createUserModal').style.display = 'none';
+            document.getElementById('userForm').reset();
+            currentEditUsername = null;
+        }
+
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const pathsText = document.getElementById('allowedPaths').value.trim();
+            const allowedPaths = pathsText 
+                ? pathsText.split('\n').map(p => p.trim()).filter(p => p.length > 0)
+                : [];
+
+            try {
+                const url = currentEditUsername 
+                    ? `/api/users/${encodeURIComponent(currentEditUsername)}`
+                    : '/api/users';
+                const method = currentEditUsername ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        allowedPaths: allowedPaths
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+                    return;
+                }
+
+                const user = await response.json();
+                if (currentEditUsername) {
+                    alert('Пользователь обновлен!');
+                } else {
+                    alert(`Пользователь создан!\n\nИмя: ${user.username}\nTOTP Секрет: ${user.totpSecret}\n\nСохраните TOTP секрет! Он больше не будет показан.`);
+                }
+                
+                closeUserModal();
+                loadUsers();
+            } catch (error) {
+                console.error('Ошибка сохранения пользователя:', error);
+                alert('Ошибка при сохранении пользователя');
+            }
+        });
+
+        function deleteUser(username) {
+            if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/users/${encodeURIComponent(username)}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (response.ok) {
+                        loadUsers();
+                    } else {
+                        response.json().then(data => {
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка удаления пользователя:', error);
+                    alert('Ошибка при удалении пользователя');
+                });
+        }
+
+        // Закрытие модального окна при клике вне его
+        window.onclick = function(event) {
+            const modal = document.getElementById('createUserModal');
+            if (event.target === modal) {
+                closeUserModal();
+            }
+        }
+
+        // Автоматическое обновление каждые 5 секунд
+        loadUsers();
+        loadSessions();
+        setInterval(() => {
+            loadUsers();
+            loadSessions();
+        }, 5000);
+    </script>
+</body>
+</html>
+
