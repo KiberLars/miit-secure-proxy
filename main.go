@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/valkey-io/valkey-go"
@@ -12,6 +14,9 @@ var config *Config
 var valkeyClient valkey.Client
 
 func main() {
+	// Устанавливаем release режим для production
+	gin.SetMode(gin.ReleaseMode)
+
 	var err error
 	config, err = ReadConfig()
 	if err != nil {
@@ -24,11 +29,28 @@ func main() {
 	}
 	defer valkeyClient.Close()
 
-	go startAuthServer()
+	// Проверяем наличие сертификатов
+	certFile := "certs/_.secure-proxy.lan.crt"
+	keyFile := "certs/_.secure-proxy.lan.pem"
+	if _, err := os.Stat(certFile); os.IsNotExist(err) {
+		log.Fatalf("Сертификат не найден: %s. Убедитесь, что файл находится в директории certs/", certFile)
+	}
+	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+		log.Fatalf("Ключ не найден: %s. Убедитесь, что файл находится в директории certs/", keyFile)
+	}
+
+	log.Println("Запуск auth сервера на порту 8443...")
+	go func() {
+		if err := startAuthServer(); err != nil {
+			log.Printf("Ошибка запуска auth сервера: %v", err)
+		}
+	}()
+
+	log.Println("Запуск proxy сервера на порту 9443...")
 	startProxyServer()
 }
 
-func startAuthServer() {
+func startAuthServer() error {
 	auth := gin.Default()
 	auth.LoadHTMLGlob("templates/*")
 
@@ -53,12 +75,35 @@ func startAuthServer() {
 		api.DELETE("/sessions/:key", handleDeleteSession)
 	}
 
-	auth.RunTLS(":8443", "_.secure-proxy.lan.crt", "_.secure-proxy.lan.pem")
+	return auth.RunTLS(":8443", "certs/_.secure-proxy.lan.crt", "certs/_.secure-proxy.lan.pem")
 }
 
 func startProxyServer() {
 	proxy := gin.Default()
+	proxy.LoadHTMLGlob("templates/*")
+	proxy.POST("/logout", handleLogout)
+	
+	// Публичные маршруты (без аутентификации) для пассажиров
+	proxy.Any("/passenger", handlePublicProxy)
+	proxy.Any("/passenger/*path", handlePublicProxy)
+	proxy.Any("/пассажир", handlePublicProxy)
+	proxy.Any("/пассажир/*path", handlePublicProxy)
+	// Публичные API для заказов (создание и просмотр заказов пассажирами)
+	// POST /orders - создание заказа (публичный)
+	proxy.POST("/orders", handlePublicProxy)
+	// OPTIONS /orders - для CORS preflight
+	proxy.OPTIONS("/orders", handlePublicProxy)
+	// GET /orders/:id - просмотр конкретного заказа пассажиром (публичный)
+	proxy.GET("/orders/:id", handlePublicProxy)
+	// OPTIONS /orders/:id - для CORS preflight
+	proxy.OPTIONS("/orders/:id", handlePublicProxy)
+	
+	// Защищенные маршруты (требуют аутентификации)
 	proxy.Use(authMiddleware())
-	proxy.Any("/*path", handleProxy)
-	proxy.RunTLS(":9443", "_.secure-proxy.lan.crt", "_.secure-proxy.lan.pem")
+	proxy.GET("/", handleDashboard)
+	proxy.NoRoute(handleProxy)
+	port := getProxyPort()
+	if err := proxy.RunTLS(fmt.Sprintf(":%d", port), "certs/_.secure-proxy.lan.crt", "certs/_.secure-proxy.lan.pem"); err != nil {
+		log.Fatalf("Ошибка запуска proxy сервера: %v", err)
+	}
 }

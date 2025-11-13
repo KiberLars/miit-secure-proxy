@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -8,6 +9,148 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type DashboardLink struct {
+	Title string
+	URL   string
+}
+
+func handleDashboard(c *gin.Context) {
+	username, exists := c.Get("username")
+	if !exists {
+		c.String(http.StatusUnauthorized, "Не авторизован")
+		return
+	}
+
+	var user *UserConfig
+	for _, u := range config.Users {
+		if u.Username == username.(string) {
+			user = &u
+			break
+		}
+	}
+
+	if user == nil {
+		c.String(http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	currentHost := strings.Split(c.Request.Host, ":")[0]
+	links := buildDashboardLinks(user, currentHost)
+
+	c.HTML(http.StatusOK, "dashboard.html", gin.H{
+		"Username": username.(string),
+		"Links":    links,
+	})
+}
+
+func buildDashboardLinks(user *UserConfig, currentHost string) []DashboardLink {
+	var links []DashboardLink
+	seen := make(map[string]bool)
+	port := getProxyPort()
+
+	for _, allowed := range user.AllowedPaths {
+		allowed = strings.TrimSpace(allowed)
+		if allowed == "" {
+			continue
+		}
+
+		var linkURL, linkTitle string
+
+		if strings.Contains(allowed, "/") && !strings.HasPrefix(allowed, "/") {
+			parts := strings.SplitN(allowed, "/", 2)
+			host := parts[0]
+			path := "/" + parts[1]
+			linkURL = fmt.Sprintf("https://%s:%d%s", host, port, path)
+			linkTitle = formatTitle(host, path)
+		} else if strings.HasPrefix(allowed, "/") {
+			linkURL = fmt.Sprintf("https://%s:%d%s", currentHost, port, allowed)
+			linkTitle = formatTitle(currentHost, allowed)
+		} else {
+			linkURL = fmt.Sprintf("https://%s:%d/", allowed, port)
+			linkTitle = formatTitle(allowed, "/")
+		}
+
+		if !seen[linkURL] {
+			seen[linkURL] = true
+			links = append(links, DashboardLink{
+				Title: linkTitle,
+				URL:   linkURL,
+			})
+		}
+	}
+
+	return links
+}
+
+func formatTitle(host, path string) string {
+	if path == "/" {
+		return host
+	}
+	path = strings.Trim(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 {
+		first := parts[0]
+		if len(first) > 0 {
+			return strings.ToUpper(first[:1]) + strings.ToLower(first[1:])
+		}
+		return first
+	}
+	return host
+}
+
+func handlePublicProxy(c *gin.Context) {
+	c.Request.Host = strings.Split(c.Request.Host, ":")[0]
+
+	var upstream *UpstreamConfig
+	for _, u := range config.Upstreams {
+		if u.Host == c.Request.Host {
+			upstream = &u
+			break
+		}
+	}
+
+	if upstream == nil {
+		c.String(http.StatusNotFound, "Upstream не найден: %s", c.Request.Host)
+		return
+	}
+
+	// Публичные маршруты - пропускаем без проверки доступа
+	target, err := url.Parse(upstream.Destination)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Ошибка парсинга upstream: %v", err)
+		return
+	}
+
+	// Обработка OPTIONS запросов для CORS (до проксирования)
+	if c.Request.Method == "OPTIONS" {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Header("Access-Control-Max-Age", "3600")
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Настраиваем директор для правильной передачи пути и заголовков
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		// Сохраняем оригинальный путь и параметры запроса
+		req.URL.Path = c.Request.URL.Path
+		req.URL.RawQuery = c.Request.URL.RawQuery
+		// Устанавливаем заголовки для upstream
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Header.Set("X-Forwarded-Host", c.Request.Host)
+		req.Header.Set("X-Real-IP", c.ClientIP())
+		// Сохраняем оригинальный метод запроса
+		req.Method = c.Request.Method
+	}
+
+	proxy.ServeHTTP(c.Writer, c.Request)
+}
 
 func handleProxy(c *gin.Context) {
 	c.Request.Host = strings.Split(c.Request.Host, ":")[0]

@@ -3,13 +3,19 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/valkey-io/valkey-go"
 )
 
 func NewValkeyClient() (valkey.Client, error) {
+	valkeyAddress := os.Getenv("VALKEY_ADDRESS")
+	if valkeyAddress == "" {
+		valkeyAddress = "127.0.0.1:6379"
+	}
+
 	client, err := valkey.NewClient(valkey.ClientOption{
-		InitAddress: []string{"127.0.0.1:6379"},
+		InitAddress: []string{valkeyAddress},
 	})
 	if err != nil {
 		return nil, err
@@ -21,6 +27,6 @@ func NewValkeyClient() (valkey.Client, error) {
 		return nil, err
 	}
 
-	log.Println("Connected to Valkey successfully")
+	log.Printf("Connected to Valkey successfully at %s", valkeyAddress)
 	return client, nil
 }

@@ -1,16 +1,20 @@
+proxy:
+    defaultHost: rest.secure-proxy.lan
+    port: 9443
 sessions:
     cookieDomain: .secure-proxy.lan
     cookieName: SECURE_PROXY_SESSION
     ttlSeconds: 18000
 users:
-    - username: user1
-      totpSecret: FC5PJKPSPKIO5HE2Y5YDIEJJ3ZOJ5J3K
-      allowedPaths:
-        - site1.secure-proxy.lan/warehouse
     - username: sklad
       totpSecret: VGLFTEMMJYNRCC36PNS6ZCURQPLYAXRY
       allowedPaths:
-        - site1.secure-proxy.lan/склад
+        - rest.secure-proxy.lan/warehouse
+        - rest.secure-proxy.lan/kitchen
+    - username: выпывп
+      totpSecret: 3PEANXK3QDP2MKUN3NSH7CDSTJOFKCK3
+      allowedPaths:
+        - docker-compose restart proxy
 upstreams:
-    - host: site1.secure-proxy.lan
-      destination: http://127.0.0.1:8000
+    - host: rest.secure-proxy.lan
+      destination: http://host.docker.internal:8000

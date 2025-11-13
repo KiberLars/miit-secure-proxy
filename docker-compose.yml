@@ -1,10 +1,34 @@
+version: "3.9"
+
 services:
   valkey:
     image: valkey/valkey:7.2-alpine
+    container_name: proxy_valkey
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - valkey_data:/data
-      
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proxy_secure_proxy
+    depends_on:
+      - valkey
+    environment:
+      - VALKEY_ADDRESS=valkey:6379
+      - CONFIG_PATH=/app/config.yaml
+      - GIN_MODE=release
+    ports:
+      - "8443:8443"
+      - "9443:9443"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./templates:/app/templates:ro
+      - ./certs:/app/certs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   valkey_data:

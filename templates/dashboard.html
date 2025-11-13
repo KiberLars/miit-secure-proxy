@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Доступные сервисы</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .username {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .links {
+            display: grid;
+            gap: 15px;
+        }
+        .link-item {
+            display: block;
+            padding: 20px;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+        .link-item:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .link-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .link-url {
+            font-size: 14px;
+            opacity: 0.7;
+            font-family: 'Courier New', monospace;
+        }
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Доступные сервисы</h1>
+        <div class="username">Пользователь: <strong>{{.Username}}</strong></div>
+        
+        {{if .Links}}
+        <div class="links">
+            {{range .Links}}
+            <a href="{{.URL}}" class="link-item">
+                <div class="link-title">{{.Title}}</div>
+                <div class="link-url">{{.URL}}</div>
+            </a>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="empty">Нет доступных сервисов</div>
+        {{end}}
+    </div>
+</body>
+</html>
+

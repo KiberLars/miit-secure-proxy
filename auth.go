@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
@@ -98,7 +99,7 @@ func handleLogin(c *gin.Context) {
 	)
 
 	if redirectUrl == "" {
-		redirectUrl = "https://site1.secure-proxy.lan"
+		redirectUrl = resolveDefaultRedirect(user)
 	}
 	c.Redirect(http.StatusFound, redirectUrl)
 }
@@ -113,4 +114,103 @@ func generateTOTPSecret() string {
 	bytes := make([]byte, 20)
 	rand.Read(bytes)
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bytes)
+}
+
+func resolveDefaultRedirect(user *UserConfig) string {
+	fallbackHost := defaultUpstreamHost()
+	defaultHost := getDefaultProxyHost()
+	port := getProxyPort()
+
+	if len(user.AllowedPaths) == 0 {
+		if fallbackHost == "" {
+			return fmt.Sprintf("https://%s:%d/", defaultHost, port)
+		}
+		return fmt.Sprintf("https://%s:%d/", fallbackHost, port)
+	}
+
+	candidate := strings.TrimSpace(user.AllowedPaths[0])
+	if candidate == "" {
+		if fallbackHost == "" {
+			return fmt.Sprintf("https://%s:%d/", defaultHost, port)
+		}
+		return fmt.Sprintf("https://%s:%d/", fallbackHost, port)
+	}
+
+	if strings.Contains(candidate, "://") {
+		return candidate
+	}
+
+	if strings.HasPrefix(candidate, "/") {
+		if fallbackHost == "" {
+			return fmt.Sprintf("https://%s:%d%s", defaultHost, port, candidate)
+		}
+		return fmt.Sprintf("https://%s:%d%s", fallbackHost, port, candidate)
+	}
+
+	parts := strings.SplitN(candidate, "/", 2)
+	host := strings.TrimSpace(parts[0])
+	path := ""
+	if len(parts) > 1 {
+		path = "/" + parts[1]
+	}
+
+	if host == "" {
+		host = fallbackHost
+	}
+
+	if host == "" {
+		return fmt.Sprintf("https://%s:%d/%s", defaultHost, port, strings.TrimPrefix(path, "/"))
+	}
+
+	return fmt.Sprintf("https://%s:%d%s", host, port, path)
+}
+
+func defaultUpstreamHost() string {
+	if config == nil || len(config.Upstreams) == 0 {
+		return ""
+	}
+	return config.Upstreams[0].Host
+}
+
+func getDefaultProxyHost() string {
+	if config != nil && config.Proxy.DefaultHost != "" {
+		return config.Proxy.DefaultHost
+	}
+	if config != nil && len(config.Upstreams) > 0 {
+		return config.Upstreams[0].Host
+	}
+	return "rest.secure-proxy.lan"
+}
+
+func getProxyPort() int {
+	if config != nil && config.Proxy.Port > 0 {
+		return config.Proxy.Port
+	}
+	return 9443
+}
+
+func handleLogout(c *gin.Context) {
+	sessionKey, err := c.Cookie(config.Sessions.CookieName)
+	if err == nil && sessionKey != "" {
+		ctx := context.Background()
+		valkeyClient.Do(ctx, valkeyClient.B().Del().Key(sessionKey).Build())
+	}
+
+	c.SetCookie(
+		config.Sessions.CookieName,
+		"",
+		-1,
+		"/",
+		config.Sessions.CookieDomain,
+		true,
+		true,
+	)
+
+	c.Redirect(http.StatusFound, "https://auth.secure-proxy.lan:8443/")
+}
+
+func getDashboardURL() string {
+	host := getDefaultProxyHost()
+	port := getProxyPort()
+	return fmt.Sprintf("https://%s:%d/", host, port)
 }

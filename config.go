@@ -8,9 +8,15 @@ import (
 )
 
 type Config struct {
-	Sessions  SessionsConfig   `yaml:"sessions"`
-	Users     []UserConfig     `yaml:"users"`
-	Upstreams []UpstreamConfig `yaml:"upstreams"`
+	Proxy      ProxyConfig      `yaml:"proxy"`
+	Sessions   SessionsConfig   `yaml:"sessions"`
+	Users      []UserConfig     `yaml:"users"`
+	Upstreams  []UpstreamConfig `yaml:"upstreams"`
+}
+
+type ProxyConfig struct {
+	DefaultHost string `yaml:"defaultHost"`
+	Port        int    `yaml:"port"`
 }
 
 type SessionsConfig struct {
