@@ -1,245 +1,771 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Управление пользователями и сессиями</title>
+    <title>Админ-панель</title>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            max-width: 1200px; 
-            margin: 20px auto; 
-            padding: 20px; 
-            background-color: #f5f5f5;
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        min-height: 100vh;
+        color: #e2e8f0;
+      }
+
+      header {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        padding: 20px 24px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .header-content {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .header-title h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #f1f5f9;
+        margin: 0;
+      }
+
+      main {
+        max-width: 1400px;
+        margin: 32px auto;
+        padding: 0 24px 48px;
+      }
+
+      /* Табы */
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        background: rgba(30, 41, 59, 0.6);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        border-radius: 12px;
+        padding: 8px;
+      }
+
+      .tab {
+        padding: 12px 24px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: #94a3b8;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .tab:hover {
+        color: #e2e8f0;
+        background: rgba(51, 65, 85, 0.4);
+      }
+
+      .tab.active {
+        color: #f1f5f9;
+        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+        box-shadow: 0 4px 6px rgba(139, 92, 246, 0.4);
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .content-card {
+        background: rgba(30, 41, 59, 0.6);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(139, 92, 246, 0.4);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(139, 92, 246, 0.5);
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+      }
+
+      .btn-secondary {
+        background: rgba(30, 41, 59, 0.8);
+        color: #e2e8f0;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(51, 65, 85, 0.9);
+        border-color: rgba(148, 163, 184, 0.3);
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .btn-warning {
+        background: #f59e0b;
+        color: white;
+      }
+
+      .btn-warning:hover {
+        background: #d97706;
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+      }
+
+      .table-container {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      thead {
+        background: rgba(15, 23, 42, 0.8);
+      }
+
+      th {
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #94a3b8;
+        border-bottom: 2px solid rgba(148, 163, 184, 0.2);
+      }
+
+      td {
+        padding: 16px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        color: #e2e8f0;
+      }
+
+      tbody tr {
+        transition: background-color 0.2s ease;
+      }
+
+      tbody tr:hover {
+        background: rgba(51, 65, 85, 0.4);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 6px;
+        margin-bottom: 6px;
+      }
+
+      .badge-role {
+        background: rgba(139, 92, 246, 0.2);
+        color: #c4b5fd;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+      }
+
+      .badge-permission {
+        background: rgba(34, 197, 94, 0.2);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+
+      .totp-secret {
+        font-family: monospace;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #cbd5e1;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .totp-code {
+        font-family: monospace;
+        background: rgba(59, 130, 246, 0.2);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #94a3b8;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(148, 163, 184, 0.3);
+        border-top-color: #8b5cf6;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
-        h1 { color: #333; }
-        h2 { color: #555; margin-top: 30px; }
-        .section { 
-            background: white; 
-            padding: 20px; 
-            margin-bottom: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      /* Модальные окна */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        animation: fadeIn 0.2s ease;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
         }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 15px;
+        to {
+          opacity: 1;
         }
-        th, td { 
-            padding: 12px; 
-            text-align: left; 
-            border-bottom: 1px solid #ddd; 
+      }
+
+      .modal {
+        background: rgba(30, 41, 59, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        animation: slideUp 0.3s ease;
+      }
+
+      @keyframes slideUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
         }
-        th { 
-            background-color: #007cba; 
-            color: white; 
-            font-weight: bold;
+        to {
+          transform: translateY(0);
+          opacity: 1;
         }
-        tr:hover { background-color: #f9f9f9; }
-        .btn { 
-            background: #dc3545; 
-            color: white; 
-            padding: 6px 12px; 
-            border: none; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            font-size: 12px;
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+
+      .modal-header h2 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #f1f5f9;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #94a3b8;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .modal-close:hover {
+        background: rgba(51, 65, 85, 0.6);
+        color: #f1f5f9;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        color: #cbd5e1;
+        margin-bottom: 8px;
+      }
+
+      .form-group input,
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid rgba(148, 163, 184, 0.2);
+        border-radius: 8px;
+        font-size: 14px;
+        background: rgba(15, 23, 42, 0.6);
+        color: #e2e8f0;
+        transition: border-color 0.2s ease, background 0.2s ease;
+      }
+
+      .form-group input::placeholder,
+      .form-group textarea::placeholder {
+        color: #64748b;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #8b5cf6;
+        background: rgba(15, 23, 42, 0.8);
+      }
+
+      .form-group textarea {
+        min-height: 80px;
+        font-family: monospace;
+        resize: vertical;
+      }
+
+      .form-group select {
+        min-height: 120px;
+      }
+
+      .form-group select[multiple] {
+        padding: 8px;
+      }
+
+      .help-text {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 5px;
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+
+      /* Toast уведомления */
+      .toast-container {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .toast {
+        background: rgba(30, 41, 59, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 8px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 300px;
+        animation: slideIn 0.3s ease;
+        color: #e2e8f0;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
         }
-        .btn:hover { background: #c82333; }
-        .btn-refresh {
-            background: #28a745;
-            margin-bottom: 15px;
+        to {
+          transform: translateX(0);
+          opacity: 1;
         }
-        .btn-refresh:hover { background: #218838; }
-        .status-active { color: #28a745; font-weight: bold; }
-        .status-expired { color: #dc3545; }
-        .no-data { color: #999; text-align: center; padding: 20px; }
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            background: #6c757d;
-            color: white;
+      }
+
+      .toast.success {
+        border-left: 4px solid #48bb78;
+      }
+
+      .toast.error {
+        border-left: 4px solid #f56565;
+      }
+
+      .toast-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 12px;
+      }
+
+      .toast.success .toast-icon {
+        background: rgba(34, 197, 94, 0.2);
+        color: #86efac;
+      }
+
+      .toast.error .toast-icon {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+      }
+
+      @media (max-width: 768px) {
+        .header-content {
+          flex-direction: column;
+          align-items: flex-start;
         }
-        .btn-add {
-            background: #007cba;
-            margin-bottom: 15px;
+
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
         }
-            .btn-add:hover { background: #005a87; }
-        .btn-delete {
-            background: #dc3545;
+
+        .tabs {
+          flex-direction: column;
         }
-            .btn-delete:hover { background: #c82333; }
-        .btn-edit {
-            background: #ffc107;
-            color: #333;
-            margin-right: 5px;
-        }
-            .btn-edit:hover { background: #e0a800; }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input, .form-group textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        .form-group textarea {
-            min-height: 60px;
-            font-family: monospace;
-        }
+
         .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
+          padding: 24px;
         }
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 500px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .close:hover {
-            color: black;
-        }
-        .totp-secret {
-            font-family: monospace;
-            background: #f8f9fa;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-        .totp-code {
-            font-family: monospace;
-            background: #e7f3ff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #0066cc;
-        }
-        .help-text {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
+      }
     </style>
 </head>
 <body>
-    <h1>Управление пользователями и сессиями</h1>
-    
-    <div class="section">
-        <h2>Пользователи</h2>
-        <button class="btn btn-refresh" onclick="loadUsers()">Обновить</button>
-        <button class="btn btn-add" onclick="showCreateUserModal()">Создать пользователя</button>
-        <table id="usersTable">
-            <thead>
-                <tr>
-                    <th>Имя пользователя</th>
-                    <th>TOTP Секрет</th>
-                    <th>TOTP Код</th>
-                    <th>Разрешенные пути</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody id="usersBody">
-                <tr><td colspan="5" class="no-data">Загрузка...</td></tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="section">
-        <h2>Активные сессии</h2>
-        <button class="btn btn-refresh" onclick="loadSessions()">Обновить</button>
-        <table id="sessionsTable">
-            <thead>
-                <tr>
-                    <th>Ключ сессии</th>
-                    <th>Пользователь</th>
-                    <th>TTL (секунды)</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody id="sessionsBody">
-                <tr><td colspan="4" class="no-data">Загрузка...</td></tr>
-            </tbody>
-        </table>
-    </div>
+    <header>
+        <div class="header-content">
+            <div class="header-title">
+                <h1>Админ-панель</h1>
+            </div>
+        </div>
+    </header>
 
-    <!-- Модальное окно создания пользователя -->
-    <div id="createUserModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeUserModal()">&times;</span>
-            <h2 id="modalTitle">Создать пользователя</h2>
+    <main>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('users')">Пользователи</button>
+            <button class="tab" onclick="switchTab('roles')">Роли</button>
+        </div>
+        
+        <!-- Вкладка пользователей -->
+        <div id="users-tab" class="tab-content active">
+            <div class="content-card">
+                <div class="toolbar">
+                    <h2 style="margin: 0; color: #f1f5f9; font-size: 20px;">Пользователи</h2>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="loadUsers()">
+                            <span>🔄</span> Обновить
+                        </button>
+                        <button class="btn btn-primary" onclick="showCreateUserModal()">
+                            <span>+</span> Создать пользователя
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Имя пользователя</th>
+                                <th>TOTP Секрет</th>
+                                <th>TOTP Код</th>
+                                <th>Роли</th>
+                                <th>Права</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersBody">
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <div class="loading" style="margin: 0 auto;"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Вкладка ролей -->
+        <div id="roles-tab" class="tab-content">
+            <div class="content-card">
+                <div class="toolbar">
+                    <h2 style="margin: 0; color: #f1f5f9; font-size: 20px;">Роли</h2>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="loadRoles()">
+                            <span>🔄</span> Обновить
+                        </button>
+                        <button class="btn btn-primary" onclick="showCreateRoleModal()">
+                            <span>+</span> Создать роль
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Название роли</th>
+                                <th>Права</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolesBody">
+                            <tr>
+                                <td colspan="3" class="empty-state">
+                                    <div class="loading" style="margin: 0 auto;"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Модальное окно создания/редактирования пользователя -->
+    <div class="modal-overlay" id="createUserModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Создать пользователя</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
             <form id="userForm">
                 <div class="form-group">
                     <label for="username">Имя пользователя:</label>
                     <input type="text" id="username" name="username" required>
                 </div>
                 <div class="form-group">
-                    <label for="allowedPaths">Разрешенные пути (по одному на строку):</label>
-                    <textarea id="allowedPaths" name="allowedPaths" placeholder="rest.secure-proxy.lan/склад&#10;rest.secure-proxy.lan/кухня&#10;rest.secure-proxy.lan/официант"></textarea>
-                    <div class="help-text">Формат: домен/путь (например, rest.secure-proxy.lan/склад). Это даст доступ ко всем URL вида домен/путь/*. Также можно указать просто домен (доступ ко всему домену) или /путь (доступ к пути на любом домене).</div>
+                    <label for="userRoles">Роли (выберите несколько, удерживая Ctrl):</label>
+                    <select id="userRoles" name="userRoles" multiple class="roles-select">
+                        <!-- Заполняется динамически -->
+                    </select>
+                    <div class="help-text">Удерживайте Ctrl (Cmd на Mac) для выбора нескольких ролей. Права пользователя определяются правами назначенных ролей.</div>
                 </div>
-                <button type="submit" class="btn btn-add" id="submitButton">Создать</button>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary" id="userSubmitButton">Создать</button>
+                </div>
             </form>
         </div>
     </div>
 
+    <!-- Модальное окно создания/редактирования роли -->
+    <div class="modal-overlay" id="createRoleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="roleModalTitle">Создать роль</h2>
+                <button class="modal-close" onclick="closeRoleModal()">&times;</button>
+            </div>
+            <form id="roleForm">
+                <div class="form-group">
+                    <label for="roleName">Название роли:</label>
+                    <input type="text" id="roleName" name="roleName" required>
+                </div>
+                <div class="form-group">
+                    <label for="rolePermissions">Права (по одному на строку):</label>
+                    <textarea id="rolePermissions" name="rolePermissions" placeholder="rest.secure-proxy.lan/склад&#10;rest.secure-proxy.lan/кухня&#10;rest.secure-proxy.lan/официант"></textarea>
+                    <div class="help-text">Формат: домен/путь (например, rest.secure-proxy.lan/склад). Это даст доступ ко всем URL вида домен/путь/*</div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeRoleModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary" id="roleSubmitButton">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast уведомления -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
+        let allRoles = [];
+        let currentEditUsername = null;
+        let currentEditRoleName = null;
+
+        // Toast уведомления
+        function showToast(message, type = "success") {
+            const toastContainer = document.getElementById("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-icon">${type === "success" ? "✓" : "✕"}</div>
+                <div>${message}</div>
+            `;
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = "slideIn 0.3s ease reverse";
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Переключение вкладок
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'users') {
+                loadUsers();
+            } else if (tabName === 'roles') {
+                loadRoles();
+            }
+        }
+
+        // Загрузка ролей для выпадающего списка
+        function loadRolesForSelect() {
+            return fetch('/api/roles')
+                .then(response => response.json())
+                .then(data => {
+                    allRoles = data;
+                    const select = document.getElementById('userRoles');
+                    select.innerHTML = data.map(role => 
+                        `<option value="${escapeHtml(role.name)}">${escapeHtml(role.name)}</option>`
+                    ).join('');
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки ролей:', error);
+                });
+        }
+
+        // Загрузка пользователей
         function loadUsers() {
             fetch('/api/users')
                 .then(response => response.json())
                 .then(data => {
                     const tbody = document.getElementById('usersBody');
                     if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="no-data">Нет пользователей</td></tr>';
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <div class="empty-state-icon">👤</div>
+                                    <div>Нет пользователей</div>
+                                </td>
+                            </tr>
+                        `;
                         return;
                     }
                     tbody.innerHTML = data.map(user => {
-                        const pathsHtml = user.allowedPaths && user.allowedPaths.length > 0 
-                            ? user.allowedPaths.map(p => {
-                                // Определяем тип: домен/путь, /путь, или домен
-                                let badgeColor = '#6c757d'; // серый по умолчанию
-                                if (p.includes('/') && !p.startsWith('/')) {
-                                    badgeColor = '#17a2b8'; // синий для домен/путь
-                                } else if (p.startsWith('/')) {
-                                    badgeColor = '#28a745'; // зеленый для /путь
-                                }
-                                return `<span class="badge" style="background: ${badgeColor};">${escapeHtml(p)}</span>`;
-                            }).join(' ') 
-                            : '<span class="no-data">Все пути</span>';
+                        const rolesHtml = user.roles && user.roles.length > 0 
+                            ? user.roles.map(r => `<span class="badge badge-role">${escapeHtml(r)}</span>`).join('') 
+                            : '<span style="color: #94a3b8;">Нет ролей</span>';
+                        const permissionsHtml = user.permissions && user.permissions.length > 0 
+                            ? user.permissions.map(p => `<span class="badge badge-permission">${escapeHtml(p)}</span>`).join('') 
+                            : '<span style="color: #94a3b8;">Нет прав</span>';
                         return `
                         <tr>
                             <td><strong>${escapeHtml(user.username)}</strong></td>
                             <td><span class="totp-secret">${escapeHtml(user.totpSecret)}</span></td>
                             <td><span class="totp-code">${user.totpCode || '-'}</span></td>
-                            <td>${pathsHtml}</td>
+                            <td>${rolesHtml}</td>
+                            <td>${permissionsHtml}</td>
                             <td>
-                                <button class="btn btn-edit" onclick="editUser('${escapeHtml(user.username)}')">Редактировать</button>
-                                <button class="btn btn-delete" onclick="deleteUser('${escapeHtml(user.username)}')">Удалить</button>
+                                <div class="action-buttons">
+                                    <button class="btn btn-warning btn-sm" onclick="editUser('${escapeHtml(user.username)}')">✏️ Изменить</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(user.username)}')">🗑️ Удалить</button>
+                                </div>
                             </td>
                         </tr>
                     `;
@@ -247,108 +773,120 @@
                 })
                 .catch(error => {
                     console.error('Ошибка загрузки пользователей:', error);
-                    document.getElementById('usersBody').innerHTML = '<tr><td colspan="5" class="no-data">Ошибка загрузки</td></tr>';
-                });
-        }
-
-        function loadSessions() {
-            fetch('/api/sessions')
-                .then(response => response.json())
-                .then(data => {
-                    const tbody = document.getElementById('sessionsBody');
-                    if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" class="no-data">Нет активных сессий</td></tr>';
-                        return;
-                    }
-                    tbody.innerHTML = data.map(session => `
+                    document.getElementById('usersBody').innerHTML = `
                         <tr>
-                            <td><code style="font-size: 11px;">${escapeHtml(session.key.substring(0, 16))}...</code></td>
-                            <td><strong>${escapeHtml(session.username)}</strong></td>
-                            <td><span class="status-active">${session.ttl}</span></td>
-                            <td>
-                                <button class="btn" onclick="deleteSession('${session.key}')">Удалить</button>
+                            <td colspan="6" class="empty-state">
+                                <div class="empty-state-icon">⚠️</div>
+                                <div>Ошибка загрузки</div>
                             </td>
                         </tr>
-                    `).join('');
-                })
-                .catch(error => {
-                    console.error('Ошибка загрузки сессий:', error);
-                    document.getElementById('sessionsBody').innerHTML = '<tr><td colspan="4" class="no-data">Ошибка загрузки</td></tr>';
+                    `;
                 });
         }
 
-        function deleteSession(sessionKey) {
-            if (!confirm('Вы уверены, что хотите удалить эту сессию?')) {
-                return;
-            }
-            
-            fetch(`/api/sessions/${encodeURIComponent(sessionKey)}`, {
-                method: 'DELETE'
-            })
-                .then(response => {
-                    if (response.ok) {
-                        loadSessions();
-                    } else {
-                        alert('Ошибка при удалении сессии');
+        // Загрузка ролей
+        function loadRoles() {
+            fetch('/api/roles')
+                .then(response => response.json())
+                .then(data => {
+                    allRoles = data;
+                    const tbody = document.getElementById('rolesBody');
+                    if (data.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="3" class="empty-state">
+                                    <div class="empty-state-icon">🔐</div>
+                                    <div>Нет ролей</div>
+                                </td>
+                            </tr>
+                        `;
+                        return;
                     }
+                    tbody.innerHTML = data.map(role => {
+                        const permissionsHtml = role.permissions && role.permissions.length > 0 
+                            ? role.permissions.map(p => `<span class="badge badge-permission">${escapeHtml(p)}</span>`).join('') 
+                            : '<span style="color: #94a3b8;">Нет прав</span>';
+                        return `
+                        <tr>
+                            <td><strong>${escapeHtml(role.name)}</strong></td>
+                            <td>${permissionsHtml}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-warning btn-sm" onclick="editRole('${escapeHtml(role.name)}')">✏️ Изменить</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteRole('${escapeHtml(role.name)}')">🗑️ Удалить</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    }).join('');
                 })
                 .catch(error => {
-                    console.error('Ошибка удаления сессии:', error);
-                    alert('Ошибка при удалении сессии');
+                    console.error('Ошибка загрузки ролей:', error);
+                    document.getElementById('rolesBody').innerHTML = `
+                        <tr>
+                            <td colspan="3" class="empty-state">
+                                <div class="empty-state-icon">⚠️</div>
+                                <div>Ошибка загрузки</div>
+                            </td>
+                        </tr>
+                    `;
                 });
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        let currentEditUsername = null;
-
+        // Показать модальное окно создания пользователя
         function showCreateUserModal() {
             currentEditUsername = null;
-            document.getElementById('modalTitle').textContent = 'Создать пользователя';
-            document.getElementById('submitButton').textContent = 'Создать';
+            document.getElementById('userModalTitle').textContent = 'Создать пользователя';
+            document.getElementById('userSubmitButton').textContent = 'Создать';
             document.getElementById('username').disabled = false;
             document.getElementById('userForm').reset();
-            document.getElementById('createUserModal').style.display = 'block';
+            loadRolesForSelect();
+            document.getElementById('createUserModal').classList.add('active');
         }
 
+        // Редактировать пользователя
         function editUser(username) {
             currentEditUsername = username;
-            document.getElementById('modalTitle').textContent = 'Редактировать пользователя';
-            document.getElementById('submitButton').textContent = 'Сохранить';
+            document.getElementById('userModalTitle').textContent = 'Редактировать пользователя';
+            document.getElementById('userSubmitButton').textContent = 'Сохранить';
             document.getElementById('username').disabled = true;
             document.getElementById('username').value = username;
             
-            // Загружаем данные пользователя
             fetch('/api/users')
                 .then(response => response.json())
                 .then(users => {
                     const user = users.find(u => u.username === username);
                     if (user) {
-                        document.getElementById('allowedPaths').value = user.allowedPaths.join('\n');
+                        loadRolesForSelect().then(() => {
+                            const select = document.getElementById('userRoles');
+                            if (user.roles) {
+                                Array.from(select.options).forEach(option => {
+                                    if (user.roles.includes(option.value)) {
+                                        option.selected = true;
+                                    }
+                                });
+                            }
+                        });
                     }
                 });
             
-            document.getElementById('createUserModal').style.display = 'block';
+            document.getElementById('createUserModal').classList.add('active');
         }
 
+        // Закрыть модальное окно пользователя
         function closeUserModal() {
-            document.getElementById('createUserModal').style.display = 'none';
+            document.getElementById('createUserModal').classList.remove('active');
             document.getElementById('userForm').reset();
             currentEditUsername = null;
         }
 
+        // Обработка формы пользователя
         document.getElementById('userForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const username = document.getElementById('username').value.trim();
-            const pathsText = document.getElementById('allowedPaths').value.trim();
-            const allowedPaths = pathsText 
-                ? pathsText.split('\n').map(p => p.trim()).filter(p => p.length > 0)
-                : [];
+            const rolesSelect = document.getElementById('userRoles');
+            const selectedRoles = Array.from(rolesSelect.selectedOptions).map(opt => opt.value);
 
             try {
                 const url = currentEditUsername 
@@ -363,31 +901,32 @@
                     },
                     body: JSON.stringify({
                         username: username,
-                        allowedPaths: allowedPaths
+                        roles: selectedRoles
                     })
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+                    showToast('Ошибка: ' + (error.error || 'Неизвестная ошибка'), 'error');
                     return;
                 }
 
                 const user = await response.json();
                 if (currentEditUsername) {
-                    alert('Пользователь обновлен!');
+                    showToast('Пользователь обновлен!');
                 } else {
-                    alert(`Пользователь создан!\n\nИмя: ${user.username}\nTOTP Секрет: ${user.totpSecret}\n\nСохраните TOTP секрет! Он больше не будет показан.`);
+                    showToast(`Пользователь создан! TOTP Секрет: ${user.totpSecret}`);
                 }
                 
                 closeUserModal();
                 loadUsers();
             } catch (error) {
                 console.error('Ошибка сохранения пользователя:', error);
-                alert('Ошибка при сохранении пользователя');
+                showToast('Ошибка при сохранении пользователя', 'error');
             }
         });
 
+        // Удалить пользователя
         function deleteUser(username) {
             if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
                 return;
@@ -398,35 +937,163 @@
             })
                 .then(response => {
                     if (response.ok) {
+                        showToast('Пользователь удален');
                         loadUsers();
                     } else {
                         response.json().then(data => {
-                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                            showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
                         });
                     }
                 })
                 .catch(error => {
                     console.error('Ошибка удаления пользователя:', error);
-                    alert('Ошибка при удалении пользователя');
+                    showToast('Ошибка при удалении пользователя', 'error');
                 });
         }
 
-        // Закрытие модального окна при клике вне его
-        window.onclick = function(event) {
-            const modal = document.getElementById('createUserModal');
-            if (event.target === modal) {
-                closeUserModal();
-            }
+        // Показать модальное окно создания роли
+        function showCreateRoleModal() {
+            currentEditRoleName = null;
+            document.getElementById('roleModalTitle').textContent = 'Создать роль';
+            document.getElementById('roleSubmitButton').textContent = 'Создать';
+            document.getElementById('roleName').disabled = false;
+            document.getElementById('roleForm').reset();
+            document.getElementById('createRoleModal').classList.add('active');
         }
 
-        // Автоматическое обновление каждые 5 секунд
+        // Редактировать роль
+        function editRole(roleName) {
+            currentEditRoleName = roleName;
+            document.getElementById('roleModalTitle').textContent = 'Редактировать роль';
+            document.getElementById('roleSubmitButton').textContent = 'Сохранить';
+            document.getElementById('roleName').disabled = true;
+            document.getElementById('roleName').value = roleName;
+            
+            fetch(`/api/roles/${encodeURIComponent(roleName)}`)
+                .then(response => response.json())
+                .then(role => {
+                    if (role) {
+                        document.getElementById('rolePermissions').value = role.permissions.join('\n');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки роли:', error);
+                });
+            
+            document.getElementById('createRoleModal').classList.add('active');
+        }
+
+        // Закрыть модальное окно роли
+        function closeRoleModal() {
+            document.getElementById('createRoleModal').classList.remove('active');
+            document.getElementById('roleForm').reset();
+            currentEditRoleName = null;
+        }
+
+        // Обработка формы роли
+        document.getElementById('roleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const roleName = document.getElementById('roleName').value.trim();
+            const permissionsText = document.getElementById('rolePermissions').value.trim();
+            const permissions = permissionsText 
+                ? permissionsText.split('\n').map(p => p.trim()).filter(p => p.length > 0)
+                : [];
+
+            try {
+                const url = currentEditRoleName 
+                    ? `/api/roles/${encodeURIComponent(currentEditRoleName)}`
+                    : '/api/roles';
+                const method = currentEditRoleName ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: roleName,
+                        permissions: permissions
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    showToast('Ошибка: ' + (error.error || 'Неизвестная ошибка'), 'error');
+                    return;
+                }
+
+                if (currentEditRoleName) {
+                    showToast('Роль обновлена!');
+                } else {
+                    showToast('Роль создана!');
+                }
+                
+                closeRoleModal();
+                loadRoles();
+                loadUsers();
+            } catch (error) {
+                console.error('Ошибка сохранения роли:', error);
+                showToast('Ошибка при сохранении роли', 'error');
+            }
+        });
+
+        // Удалить роль
+        function deleteRole(roleName) {
+            if (!confirm(`Вы уверены, что хотите удалить роль "${roleName}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/roles/${encodeURIComponent(roleName)}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Роль удалена');
+                        loadRoles();
+                        loadUsers();
+                    } else {
+                        response.json().then(data => {
+                            showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка удаления роли:', error);
+                    showToast('Ошибка при удалении роли', 'error');
+                });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Закрытие модальных окон при клике вне их
+        document.getElementById('createUserModal').addEventListener('click', (e) => {
+            if (e.target.id === 'createUserModal') {
+                closeUserModal();
+            }
+        });
+
+        document.getElementById('createRoleModal').addEventListener('click', (e) => {
+            if (e.target.id === 'createRoleModal') {
+                closeRoleModal();
+            }
+        });
+
+        // Автоматическое обновление каждые 10 секунд
         loadUsers();
-        loadSessions();
+        loadRoles();
         setInterval(() => {
-            loadUsers();
-            loadSessions();
-        }, 5000);
+            if (document.getElementById('users-tab').classList.contains('active')) {
+                loadUsers();
+            }
+            if (document.getElementById('roles-tab').classList.contains('active')) {
+                loadRoles();
+            }
+        }, 10000);
     </script>
 </body>
 </html>
-

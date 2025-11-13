@@ -60,15 +60,9 @@ func handleLogin(c *gin.Context) {
 	totpCode := c.PostForm("totp")
 	redirectUrl := c.PostForm("redirectUrl")
 
-	var user *UserConfig
-	for _, u := range config.Users {
-		if u.Username == username {
-			user = &u
-			break
-		}
-	}
-
-	if user == nil {
+	// Получаем пользователя из Valkey
+	user, err := GetUser(username)
+	if err != nil {
 		c.HTML(http.StatusOK, "login.html", gin.H{
 			"error":       "нет имени",
 			"redirectUrl": redirectUrl,
@@ -99,7 +93,7 @@ func handleLogin(c *gin.Context) {
 	)
 
 	if redirectUrl == "" {
-		redirectUrl = resolveDefaultRedirect(user)
+		redirectUrl = resolveDefaultRedirectFromValkey(user, username)
 	}
 	c.Redirect(http.StatusFound, redirectUrl)
 }
@@ -116,19 +110,21 @@ func generateTOTPSecret() string {
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bytes)
 }
 
-func resolveDefaultRedirect(user *UserConfig) string {
+func resolveDefaultRedirectFromValkey(user *ValkeyUser, username string) string {
 	fallbackHost := defaultUpstreamHost()
 	defaultHost := getDefaultProxyHost()
 	port := getProxyPort()
 
-	if len(user.AllowedPaths) == 0 {
+	// Получаем права пользователя
+	permissions, err := GetUserPermissions(username)
+	if err != nil || len(permissions) == 0 {
 		if fallbackHost == "" {
 			return fmt.Sprintf("https://%s:%d/", defaultHost, port)
 		}
 		return fmt.Sprintf("https://%s:%d/", fallbackHost, port)
 	}
 
-	candidate := strings.TrimSpace(user.AllowedPaths[0])
+	candidate := strings.TrimSpace(permissions[0])
 	if candidate == "" {
 		if fallbackHost == "" {
 			return fmt.Sprintf("https://%s:%d/", defaultHost, port)

@@ -22,34 +22,29 @@ func handleDashboard(c *gin.Context) {
 		return
 	}
 
-	var user *UserConfig
-	for _, u := range config.Users {
-		if u.Username == username.(string) {
-			user = &u
-			break
-		}
-	}
+	usernameStr := username.(string)
 
-	if user == nil {
-		c.String(http.StatusNotFound, "Пользователь не найден")
-		return
+	// Получаем права пользователя из Valkey
+	permissions, err := GetUserPermissions(usernameStr)
+	if err != nil {
+		permissions = []string{}
 	}
 
 	currentHost := strings.Split(c.Request.Host, ":")[0]
-	links := buildDashboardLinks(user, currentHost)
+	links := buildDashboardLinksFromPermissions(permissions, currentHost)
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"Username": username.(string),
+		"Username": usernameStr,
 		"Links":    links,
 	})
 }
 
-func buildDashboardLinks(user *UserConfig, currentHost string) []DashboardLink {
+func buildDashboardLinksFromPermissions(permissions []string, currentHost string) []DashboardLink {
 	var links []DashboardLink
 	seen := make(map[string]bool)
 	port := getProxyPort()
 
-	for _, allowed := range user.AllowedPaths {
+	for _, allowed := range permissions {
 		allowed = strings.TrimSpace(allowed)
 		if allowed == "" {
 			continue
@@ -192,53 +187,36 @@ func handleProxy(c *gin.Context) {
 }
 
 func checkAccess(username, requestHost, requestPath string, c *gin.Context) bool {
-	var user *UserConfig
-	for _, u := range config.Users {
-		if u.Username == username {
-			user = &u
-			break
-		}
-	}
+	requestHost = strings.Split(requestHost, ":")[0]
 
-	if user == nil || len(user.AllowedPaths) == 0 {
+	// Получаем права пользователя из Valkey
+	permissions, err := GetUserPermissions(username)
+	if err != nil {
+		// Если пользователь не найден или ошибка, разрешаем доступ (можно изменить на запрет)
 		return true
 	}
 
-	requestHost = strings.Split(requestHost, ":")[0]
+	// Если прав нет, разрешаем доступ
+	if len(permissions) == 0 {
+		return true
+	}
 
 	if strings.HasPrefix(requestPath, "/static/") {
-		return checkStaticAccess(user, requestHost, requestPath, c)
+		return checkStaticAccessFromPermissions(permissions, requestHost, requestPath, c)
 	}
 
-	return checkPathAccess(user, requestHost, requestPath)
+	hasAccess := checkPathAccessFromPermissions(permissions, requestHost, requestPath)
+	if !hasAccess {
+		// Редирект на главную страницу ресторана при отсутствии прав
+		redirectToMainPage(c)
+		return false
+	}
+
+	return true
 }
 
-func checkStaticAccess(user *UserConfig, requestHost, requestPath string, c *gin.Context) bool {
-	referer := c.Request.Header.Get("Referer")
-	if referer != "" {
-		refererURL, err := url.Parse(referer)
-		if err == nil {
-			refererHost := strings.Split(refererURL.Host, ":")[0]
-			refererPath := refererURL.Path
-			if checkPathAccess(user, refererHost, refererPath) {
-				return true
-			}
-		}
-	}
-
-	allowedExts := []string{".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot"}
-	for _, ext := range allowedExts {
-		if strings.HasSuffix(requestPath, ext) {
-			return true
-		}
-	}
-
-	c.String(http.StatusForbidden, "Доступ запрещен. Разрешенные пути: %s", strings.Join(user.AllowedPaths, ", "))
-	return false
-}
-
-func checkPathAccess(user *UserConfig, requestHost, requestPath string) bool {
-	for _, allowed := range user.AllowedPaths {
+func checkPathAccessFromPermissions(permissions []string, requestHost, requestPath string) bool {
+	for _, allowed := range permissions {
 		if strings.Contains(allowed, "/") {
 			parts := strings.SplitN(allowed, "/", 2)
 			allowedHost := parts[0]
@@ -257,4 +235,37 @@ func checkPathAccess(user *UserConfig, requestHost, requestPath string) bool {
 		}
 	}
 	return false
+}
+
+func checkStaticAccessFromPermissions(permissions []string, requestHost, requestPath string, c *gin.Context) bool {
+	referer := c.Request.Header.Get("Referer")
+	if referer != "" {
+		refererURL, err := url.Parse(referer)
+		if err == nil {
+			refererHost := strings.Split(refererURL.Host, ":")[0]
+			refererPath := refererURL.Path
+			if checkPathAccessFromPermissions(permissions, refererHost, refererPath) {
+				return true
+			}
+		}
+	}
+
+	allowedExts := []string{".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot"}
+	for _, ext := range allowedExts {
+		if strings.HasSuffix(requestPath, ext) {
+			return true
+		}
+	}
+
+	// Редирект на главную страницу ресторана при отсутствии прав
+	redirectToMainPage(c)
+	return false
+}
+
+// redirectToMainPage перенаправляет пользователя на главную страницу ресторана
+func redirectToMainPage(c *gin.Context) {
+	defaultHost := getDefaultProxyHost()
+	port := getProxyPort()
+	mainURL := fmt.Sprintf("https://%s:%d/", defaultHost, port)
+	c.Redirect(http.StatusFound, mainURL)
 }

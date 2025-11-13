@@ -29,6 +29,17 @@ func main() {
 	}
 	defer valkeyClient.Close()
 
+	// Опциональная миграция пользователей из config.yaml в Valkey (только если указана переменная окружения)
+	if os.Getenv("MIGRATE_FROM_CONFIG") == "true" {
+		log.Println("Запуск миграции пользователей из config.yaml...")
+		err = MigrateUsersFromConfig()
+		if err != nil {
+			log.Printf("Предупреждение: ошибка миграции пользователей: %v", err)
+		} else {
+			log.Println("Пользователи успешно мигрированы в Valkey")
+		}
+	}
+
 	// Проверяем наличие сертификатов
 	certFile := "certs/_.secure-proxy.lan.crt"
 	keyFile := "certs/_.secure-proxy.lan.pem"
@@ -73,6 +84,13 @@ func startAuthServer() error {
 		api.DELETE("/users/:username", handleDeleteUser)
 		api.GET("/sessions", handleGetSessions)
 		api.DELETE("/sessions/:key", handleDeleteSession)
+
+		// API для управления ролями
+		api.GET("/roles", handleGetRoles)
+		api.GET("/roles/:name", handleGetRole)
+		api.POST("/roles", handleCreateRole)
+		api.PUT("/roles/:name", handleUpdateRole)
+		api.DELETE("/roles/:name", handleDeleteRole)
 	}
 
 	return auth.RunTLS(":8443", "certs/_.secure-proxy.lan.crt", "certs/_.secure-proxy.lan.pem")
@@ -82,7 +100,7 @@ func startProxyServer() {
 	proxy := gin.Default()
 	proxy.LoadHTMLGlob("templates/*")
 	proxy.POST("/logout", handleLogout)
-	
+
 	// Публичные маршруты (без аутентификации) для пассажиров
 	proxy.Any("/passenger", handlePublicProxy)
 	proxy.Any("/passenger/*path", handlePublicProxy)
@@ -97,7 +115,7 @@ func startProxyServer() {
 	proxy.GET("/orders/:id", handlePublicProxy)
 	// OPTIONS /orders/:id - для CORS preflight
 	proxy.OPTIONS("/orders/:id", handlePublicProxy)
-	
+
 	// Защищенные маршруты (требуют аутентификации)
 	proxy.Use(authMiddleware())
 	proxy.GET("/", handleDashboard)
