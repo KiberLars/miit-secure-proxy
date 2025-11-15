@@ -1,7 +1,8 @@
+// Package main - обработчики проксирования запросов.
+// Содержит функции для публичного и защищенного проксирования запросов к upstream серверам.
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -10,90 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type DashboardLink struct {
-	Title string
-	URL   string
-}
-
-func handleDashboard(c *gin.Context) {
-	username, exists := c.Get("username")
-	if !exists {
-		c.String(http.StatusUnauthorized, "Не авторизован")
-		return
-	}
-
-	usernameStr := username.(string)
-
-	// Получаем права пользователя из Valkey
-	permissions, err := GetUserPermissions(usernameStr)
-	if err != nil {
-		permissions = []string{}
-	}
-
-	currentHost := strings.Split(c.Request.Host, ":")[0]
-	links := buildDashboardLinksFromPermissions(permissions, currentHost)
-
-	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"Username": usernameStr,
-		"Links":    links,
-	})
-}
-
-func buildDashboardLinksFromPermissions(permissions []string, currentHost string) []DashboardLink {
-	var links []DashboardLink
-	seen := make(map[string]bool)
-	port := getProxyPort()
-
-	for _, allowed := range permissions {
-		allowed = strings.TrimSpace(allowed)
-		if allowed == "" {
-			continue
-		}
-
-		var linkURL, linkTitle string
-
-		if strings.Contains(allowed, "/") && !strings.HasPrefix(allowed, "/") {
-			parts := strings.SplitN(allowed, "/", 2)
-			host := parts[0]
-			path := "/" + parts[1]
-			linkURL = fmt.Sprintf("https://%s:%d%s", host, port, path)
-			linkTitle = formatTitle(host, path)
-		} else if strings.HasPrefix(allowed, "/") {
-			linkURL = fmt.Sprintf("https://%s:%d%s", currentHost, port, allowed)
-			linkTitle = formatTitle(currentHost, allowed)
-		} else {
-			linkURL = fmt.Sprintf("https://%s:%d/", allowed, port)
-			linkTitle = formatTitle(allowed, "/")
-		}
-
-		if !seen[linkURL] {
-			seen[linkURL] = true
-			links = append(links, DashboardLink{
-				Title: linkTitle,
-				URL:   linkURL,
-			})
-		}
-	}
-
-	return links
-}
-
-func formatTitle(host, path string) string {
-	if path == "/" {
-		return host
-	}
-	path = strings.Trim(path, "/")
-	parts := strings.Split(path, "/")
-	if len(parts) > 0 {
-		first := parts[0]
-		if len(first) > 0 {
-			return strings.ToUpper(first[:1]) + strings.ToLower(first[1:])
-		}
-		return first
-	}
-	return host
-}
-
+// handlePublicProxy обрабатывает публичные запросы без проверки аутентификации
 func handlePublicProxy(c *gin.Context) {
 	c.Request.Host = strings.Split(c.Request.Host, ":")[0]
 
@@ -128,25 +46,11 @@ func handlePublicProxy(c *gin.Context) {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	// Настраиваем директор для правильной передачи пути и заголовков
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		// Сохраняем оригинальный путь и параметры запроса
-		req.URL.Path = c.Request.URL.Path
-		req.URL.RawQuery = c.Request.URL.RawQuery
-		// Устанавливаем заголовки для upstream
-		req.Header.Set("X-Forwarded-Proto", "https")
-		req.Header.Set("X-Forwarded-Host", c.Request.Host)
-		req.Header.Set("X-Real-IP", c.ClientIP())
-		// Сохраняем оригинальный метод запроса
-		req.Method = c.Request.Method
-	}
-
+	configureProxyDirector(proxy, c)
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
+// handleProxy обрабатывает защищенные запросы с проверкой аутентификации и авторизации
 func handleProxy(c *gin.Context) {
 	c.Request.Host = strings.Split(c.Request.Host, ":")[0]
 
@@ -165,8 +69,6 @@ func handleProxy(c *gin.Context) {
 
 	username, exists := c.Get("username")
 	if !exists {
-		// Это не должно происходить, так как authMiddleware должен был сделать редирект
-		// Но на всякий случай проверяем
 		c.String(http.StatusUnauthorized, "Не авторизован")
 		return
 	}
@@ -182,120 +84,20 @@ func handleProxy(c *gin.Context) {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	// Настраиваем директор для правильной передачи пути и заголовков
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		// Сохраняем оригинальный путь и параметры запроса
-		req.URL.Path = c.Request.URL.Path
-		req.URL.RawQuery = c.Request.URL.RawQuery
-		// Устанавливаем заголовки для upstream
-		req.Header.Set("X-Forwarded-Proto", "https")
-		req.Header.Set("X-Forwarded-Host", c.Request.Host)
-		req.Header.Set("X-Real-IP", c.ClientIP())
-		// Сохраняем оригинальный метод запроса
-		req.Method = c.Request.Method
-	}
-
+	configureProxyDirector(proxy, c)
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
-func checkAccess(username, requestHost, requestPath string, c *gin.Context) bool {
-	requestHost = strings.Split(requestHost, ":")[0]
-
-	// Получаем права пользователя из Valkey
-	permissions, err := GetUserPermissions(username)
-	if err != nil {
-		// Если пользователь не найден или ошибка, разрешаем доступ (можно изменить на запрет)
-		return true
+// configureProxyDirector настраивает директор прокси для правильной передачи пути и заголовков
+func configureProxyDirector(proxy *httputil.ReverseProxy, c *gin.Context) {
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.URL.Path = c.Request.URL.Path
+		req.URL.RawQuery = c.Request.URL.RawQuery
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Header.Set("X-Forwarded-Host", c.Request.Host)
+		req.Header.Set("X-Real-IP", c.ClientIP())
+		req.Method = c.Request.Method
 	}
-
-	// Если прав нет, разрешаем доступ
-	if len(permissions) == 0 {
-		return true
-	}
-
-	if strings.HasPrefix(requestPath, "/static/") {
-		return checkStaticAccessFromPermissions(permissions, requestHost, requestPath, c)
-	}
-
-	hasAccess := checkPathAccessFromPermissions(permissions, requestHost, requestPath)
-	if !hasAccess {
-		// Проверяем, является ли запрос API запросом
-		acceptHeader := c.GetHeader("Accept")
-		contentType := c.GetHeader("Content-Type")
-		isAPIRequest := strings.Contains(acceptHeader, "application/json") ||
-			strings.Contains(contentType, "application/json") ||
-			strings.HasPrefix(requestPath, "/waiter/") ||
-			strings.HasPrefix(requestPath, "/api/")
-
-		if isAPIRequest {
-			// Для API запросов возвращаем JSON ошибку
-			c.JSON(http.StatusForbidden, gin.H{
-				"detail": "Доступ запрещен. Недостаточно прав для доступа к этому ресурсу.",
-			})
-		} else {
-			// Для обычных запросов делаем редирект
-			redirectToMainPage(c)
-		}
-		return false
-	}
-
-	return true
-}
-
-func checkPathAccessFromPermissions(permissions []string, requestHost, requestPath string) bool {
-	for _, allowed := range permissions {
-		if strings.Contains(allowed, "/") {
-			parts := strings.SplitN(allowed, "/", 2)
-			allowedHost := parts[0]
-			allowedPath := "/" + parts[1]
-			if allowedHost == requestHost && strings.HasPrefix(requestPath, allowedPath) {
-				return true
-			}
-		} else if strings.HasPrefix(allowed, "/") {
-			if strings.HasPrefix(requestPath, allowed) {
-				return true
-			}
-		} else {
-			if allowed == requestHost {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func checkStaticAccessFromPermissions(permissions []string, requestHost, requestPath string, c *gin.Context) bool {
-	referer := c.Request.Header.Get("Referer")
-	if referer != "" {
-		refererURL, err := url.Parse(referer)
-		if err == nil {
-			refererHost := strings.Split(refererURL.Host, ":")[0]
-			refererPath := refererURL.Path
-			if checkPathAccessFromPermissions(permissions, refererHost, refererPath) {
-				return true
-			}
-		}
-	}
-
-	allowedExts := []string{".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot"}
-	for _, ext := range allowedExts {
-		if strings.HasSuffix(requestPath, ext) {
-			return true
-		}
-	}
-
-	// Редирект на главную страницу ресторана при отсутствии прав
-	redirectToMainPage(c)
-	return false
-}
-
-// redirectToMainPage перенаправляет пользователя на главную страницу ресторана
-func redirectToMainPage(c *gin.Context) {
-	defaultHost := getDefaultProxyHost()
-	port := getProxyPort()
-	mainURL := fmt.Sprintf("https://%s:%d/", defaultHost, port)
-	c.Redirect(http.StatusFound, mainURL)
 }

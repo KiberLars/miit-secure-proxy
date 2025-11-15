@@ -104,16 +104,10 @@ func startProxyServer() {
 	// Публичные маршруты (без аутентификации) для пассажиров
 	proxy.Any("/passenger", handlePublicProxy)
 	proxy.Any("/passenger/*path", handlePublicProxy)
-	proxy.Any("/пассажир", handlePublicProxy)
-	proxy.Any("/пассажир/*path", handlePublicProxy)
 	// Публичные API для заказов (создание и просмотр заказов пассажирами)
-	// POST /orders - создание заказа (публичный)
 	proxy.POST("/orders", handlePublicProxy)
-	// OPTIONS /orders - для CORS preflight
 	proxy.OPTIONS("/orders", handlePublicProxy)
-	// GET /orders/:id - просмотр конкретного заказа пассажиром (публичный)
 	proxy.GET("/orders/:id", handlePublicProxy)
-	// OPTIONS /orders/:id - для CORS preflight
 	proxy.OPTIONS("/orders/:id", handlePublicProxy)
 
 	// Защищенные маршруты (требуют аутентификации)
@@ -122,8 +116,6 @@ func startProxyServer() {
 	// Маршруты для официанта
 	proxy.Any("/waiter", handleProxy)
 	proxy.Any("/waiter/*path", handleProxy)
-	proxy.Any("/официант", handleProxy)
-	proxy.Any("/официант/*path", handleProxy)
 	proxy.NoRoute(handleProxy)
 	port := getProxyPort()
 	if err := proxy.RunTLS(fmt.Sprintf(":%d", port), "certs/_.secure-proxy.lan.crt", "certs/_.secure-proxy.lan.pem"); err != nil {
