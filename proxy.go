@@ -175,13 +175,28 @@ func handleProxy(c *gin.Context) {
 		return
 	}
 
-	target, _ := url.Parse(upstream.Destination)
+	target, err := url.Parse(upstream.Destination)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Ошибка парсинга upstream: %v", err)
+		return
+	}
+
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	c.Request.URL.Host = target.Host
-	c.Request.URL.Scheme = target.Scheme
-	c.Request.Header.Set("X-Forwarded-Host", c.Request.Header.Get("Host"))
-	c.Request.Host = target.Host
+	// Настраиваем директор для правильной передачи пути и заголовков
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		// Сохраняем оригинальный путь и параметры запроса
+		req.URL.Path = c.Request.URL.Path
+		req.URL.RawQuery = c.Request.URL.RawQuery
+		// Устанавливаем заголовки для upstream
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Header.Set("X-Forwarded-Host", c.Request.Host)
+		req.Header.Set("X-Real-IP", c.ClientIP())
+		// Сохраняем оригинальный метод запроса
+		req.Method = c.Request.Method
+	}
 
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
@@ -207,8 +222,23 @@ func checkAccess(username, requestHost, requestPath string, c *gin.Context) bool
 
 	hasAccess := checkPathAccessFromPermissions(permissions, requestHost, requestPath)
 	if !hasAccess {
-		// Редирект на главную страницу ресторана при отсутствии прав
-		redirectToMainPage(c)
+		// Проверяем, является ли запрос API запросом
+		acceptHeader := c.GetHeader("Accept")
+		contentType := c.GetHeader("Content-Type")
+		isAPIRequest := strings.Contains(acceptHeader, "application/json") ||
+			strings.Contains(contentType, "application/json") ||
+			strings.HasPrefix(requestPath, "/waiter/") ||
+			strings.HasPrefix(requestPath, "/api/")
+
+		if isAPIRequest {
+			// Для API запросов возвращаем JSON ошибку
+			c.JSON(http.StatusForbidden, gin.H{
+				"detail": "Доступ запрещен. Недостаточно прав для доступа к этому ресурсу.",
+			})
+		} else {
+			// Для обычных запросов делаем редирект
+			redirectToMainPage(c)
+		}
 		return false
 	}
 

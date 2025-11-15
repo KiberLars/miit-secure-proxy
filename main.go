@@ -119,6 +119,11 @@ func startProxyServer() {
 	// Защищенные маршруты (требуют аутентификации)
 	proxy.Use(authMiddleware())
 	proxy.GET("/", handleDashboard)
+	// Маршруты для официанта
+	proxy.Any("/waiter", handleProxy)
+	proxy.Any("/waiter/*path", handleProxy)
+	proxy.Any("/официант", handleProxy)
+	proxy.Any("/официант/*path", handleProxy)
 	proxy.NoRoute(handleProxy)
 	port := getProxyPort()
 	if err := proxy.RunTLS(fmt.Sprintf(":%d", port), "certs/_.secure-proxy.lan.crt", "certs/_.secure-proxy.lan.pem"); err != nil {
